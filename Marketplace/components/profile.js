@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useState, useRef, useEffect } from "react";
 import { useAccount, useEnsAvatar, useEnsName } from "wagmi";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
+import { ethers } from "ethers";
 import {
   MoreVertical,
   X,
@@ -91,6 +92,14 @@ export default function ProfilePage() {
   }, [slugPopup]);
 
   useEffect(() => {
+    const nameSet = () => {
+      const sliced = address?.slice(-2) || "";
+      setusername(sliced);
+    };
+    nameSet();
+  }, [address]);
+
+  useEffect(() => {
     async function fetchNFTs() {
       if (!address) {
         setIsLoading(false);
@@ -99,13 +108,47 @@ export default function ProfilePage() {
       setIsLoading(true);
       try {
         const slugData = await GetSlug(address);
-        if (slugData?.collections?.[0]?.data) {
-          const { ownerNFTs = [], listedNFTs = [] } =
-            slugData.collections[0].data;
+        if (slugData?.collections) {
+          let allOwnerNFTs = [];
+          let allListedNFTs = [];
+          let collectionName = "My Collection";
+
+          slugData.collections.forEach((collection) => {
+            if (collection?.data) {
+              const { ownerNFTs = [], listedNFTs = [] } = collection.data;
+
+              const processedListed = listedNFTs.map((nft) => ({
+                ...nft,
+                formattedPrice: nft.price
+                  ? parseFloat(ethers.formatEther(nft.price))
+                  : 0,
+                currency:
+                  nft.currency === "0x0000000000000000000000000000000000000000"
+                    ? "ETH"
+                    : "N/A",
+              }));
+
+              allListedNFTs = [...allListedNFTs, ...processedListed];
+
+              const processedOwner = ownerNFTs.filter(
+                (ownerNFT) =>
+                  !allListedNFTs.some(
+                    (listedNFT) => listedNFT.identifier === ownerNFT.identifier
+                  )
+              );
+
+              allOwnerNFTs = [...allOwnerNFTs, ...processedOwner];
+
+              if (collection.slug && collectionName === "My Collection") {
+                collectionName = collection.slug;
+              }
+            }
+          });
+
           setNftData({
-            ownerNFTs,
-            listedNFTs,
-            collectionName: slugData.collections[0].slug || "My Collection",
+            ownerNFTs: allOwnerNFTs,
+            listedNFTs: allListedNFTs,
+            collectionName: collectionName,
           });
         }
       } catch (error) {
@@ -121,14 +164,6 @@ export default function ProfilePage() {
     return /^(?!-)(?!.*--)[a-z0-9-]+(?<!-)$/.test(slug);
   };
 
-  useEffect(() => {
-    const nameSet = () => {
-      const sliced = address?.slice(-2) || "";
-      setusername(sliced);
-    };
-    nameSet();
-  }, [address]);
-
   const handleSaveSlug = async () => {
     setLoading(true);
     if (!slug.trim()) {
@@ -138,7 +173,7 @@ export default function ProfilePage() {
     }
     if (!isValidSlug(slug)) {
       alert(
-        "Slug can only contain lowercase letters, numbers, and single hyphens (no leading, trailing, or consecutive hyphens)"
+        "Slug can only contain lowercase letters, numbers, and single hyphens"
       );
       setLoading(false);
       return;
@@ -162,18 +197,6 @@ export default function ProfilePage() {
     navigator.clipboard.writeText(address);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
-  };
-
-  const isNFTListed = (nft) => {
-    return nftData.listedNFTs.some(
-      (listedNFT) => listedNFT.identifier === nft.identifier
-    );
-  };
-
-  const getListingDetails = (nft) => {
-    return nftData.listedNFTs.find(
-      (listedNFT) => listedNFT.identifier === nft.identifier
-    );
   };
 
   if (!isConnected) {
@@ -218,6 +241,7 @@ export default function ProfilePage() {
             )}
           </div>
         </div>
+
         <div className="absolute -bottom-20 left-6 flex items-end">
           <div className="relative group">
             {avatar ? (
@@ -259,55 +283,50 @@ export default function ProfilePage() {
                 {address?.slice(0, 6)}...{address?.slice(-4)}
               </span>
               <span className="text-sm bg-[#b2ff00]/10 text-[#b2ff00] px-3 py-1.5 rounded-full border border-[#b2ff00]/20">
-                {nftData.ownerNFTs.length} NFTs
+                {nftData.ownerNFTs.length + nftData.listedNFTs.length} NFTs
               </span>
             </div>
           </div>
         </div>
       </div>
+
       <div className="max-w-7xl mx-auto px-6 pt-28 pb-16">
         {nftData.listedNFTs.length > 0 && (
           <div className="mb-12">
             <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
-              <span className="text-[#fffff]">Listed NFTs</span>
+              <span className="text-white">Listed NFTs</span>
               <span className="text-sm bg-[#b2ff00]/10 text-[#b2ff00] px-2 py-1 rounded">
                 {nftData.listedNFTs.length} for sale
               </span>
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-              {nftData.listedNFTs.map((nft) => {
-                const listing = getListingDetails(nft);
-                return (
-                  <NFTCard
-                    key={`listed-${nft.identifier}`}
-                    nft={nft}
-                    isListed={true}
-                    price={
-                      listing ? parseInt(listing.price?.value || "0") / 1e18 : 0
-                    }
-                  />
-                );
-              })}
+              {nftData.listedNFTs.map((nft) => (
+                <NFTCard
+                  key={`${Date.now()}-${Math.random()
+                    .toString(36)
+                    .substring(2, 9)}`}
+                  nft={nft}
+                  isListed={true}
+                  price={nft.formattedPrice}
+                  currency={nft.currency}
+                />
+              ))}
             </div>
           </div>
         )}
+
         <h2 className="text-xl font-bold mb-6">{nftData.collectionName}</h2>
         {nftData.ownerNFTs.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {nftData.ownerNFTs.map((nft) => {
-              const isListed = isNFTListed(nft);
-              const listing = isListed ? getListingDetails(nft) : null;
-              return (
-                <NFTCard
-                  key={`owned-${nft.identifier}`}
-                  nft={nft}
-                  isListed={isListed}
-                  price={
-                    listing ? parseInt(listing.price?.value || "0") / 1e18 : 0
-                  }
-                />
-              );
-            })}
+            {nftData.ownerNFTs.map((nft) => (
+              <NFTCard
+                key={`${Date.now()}-${Math.random()
+                  .toString(36)
+                  .substring(2, 9)}`}
+                nft={nft}
+                isListed={false}
+              />
+            ))}
           </div>
         ) : (
           <div className="text-center py-16">
@@ -315,11 +334,12 @@ export default function ProfilePage() {
           </div>
         )}
       </div>
+
       {slugPopup && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in">
           <div
             ref={popupRef}
-            className="bg-[#1a1a1a] p-6 rounded-xl border border-[#404040] w-full max-w-md shadow-xl transform transition-all duration-300 scale-95 hover:scale-100"
+            className="bg-[#1a1a1a] p-6 rounded-xl border border-[#404040] w-full max-w-md shadow-xl"
           >
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-bold text-white">Create New Slug</h2>
@@ -369,23 +389,7 @@ export default function ProfilePage() {
                     <span>Saving...</span>
                   </>
                 ) : (
-                  <>
-                    <span>Save Slug</span>
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="h-4 w-4 ml-1"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M5 13l4 4L19 7"
-                      />
-                    </svg>
-                  </>
+                  "Save Slug"
                 )}
               </button>
             </div>
@@ -396,7 +400,7 @@ export default function ProfilePage() {
   );
 }
 
-const NFTCard = ({ nft, isListed, price }) => {
+const NFTCard = ({ nft, isListed, price, currency = "ETH" }) => {
   return (
     <div
       className={`bg-[#1a1a1a] rounded-xl overflow-hidden border ${
@@ -406,7 +410,7 @@ const NFTCard = ({ nft, isListed, price }) => {
       } transition-all group relative`}
     >
       {isListed && (
-        <div className="absolute top-2 right-2 flex items-center gap-1 bg-black/50 backdrop-blur-sm border border-[#b2ff00] text-[#b2ff00] text-xs font-bold px-2 py-1 rounded-full z-10 transform transition-transform hover:scale-105">
+        <div className="absolute top-2 right-2 flex items-center gap-1 bg-black/50 backdrop-blur-sm border border-[#b2ff00] text-[#b2ff00] text-xs font-bold px-2 py-1 rounded-full z-10">
           <svg
             xmlns="http://www.w3.org/2000/svg"
             width="12"
@@ -417,7 +421,6 @@ const NFTCard = ({ nft, isListed, price }) => {
             strokeWidth="2"
             strokeLinecap="round"
             strokeLinejoin="round"
-            className="text-[#b2ff00]"
           >
             <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path>
           </svg>
@@ -430,7 +433,7 @@ const NFTCard = ({ nft, isListed, price }) => {
             src={nft.image_url}
             alt={nft.name}
             fill
-            className="object-cover"
+            className="object-cover group-hover:scale-105 transition-transform"
             unoptimized
           />
         ) : (
@@ -448,7 +451,7 @@ const NFTCard = ({ nft, isListed, price }) => {
             <p className="text-xs text-gray-400">{isListed ? "Price" : "ID"}</p>
             {isListed ? (
               <span className="text-[#b2ff00] text-sm font-mono">
-                {price} ETH
+                {price?.toFixed(4)} {currency}
               </span>
             ) : (
               <span className="text-[#b2ff00] text-sm font-mono">

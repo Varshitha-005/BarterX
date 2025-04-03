@@ -212,7 +212,7 @@ export default function ProductDetail() {
           Product not found
         </h2>
         <p className="text-gray-400 max-w-md">
-          The product you're looking for doesn't exist or may have been removed.
+          The product you`re looking for doesn`t exist or may have been removed.
         </p>
         <button
           onClick={() => router.push("/")}

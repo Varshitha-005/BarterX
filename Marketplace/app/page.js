@@ -405,7 +405,7 @@ export default function Marketplace() {
                   No Favorites Yet
                 </h3>
                 <p className="text-gray-400/90 max-w-xs mx-auto text-sm leading-relaxed">
-                  You haven't added any items to your favorites collection
+                  You haven`t added any items to your favorites collection
                 </p>
               </div>
             </motion.div>

@@ -2,12 +2,51 @@
 
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import Link from "next/link";
-import { useState } from "react";
-import { UserRoundIcon } from "lucide-react";
+import { useEffect, useState } from "react";
+import { CoinsIcon, UserRoundIcon } from "lucide-react";
 import Image from "next/image";
+import erc_conto from "@/contract/Erc20.json";
+import { ethers } from "ethers";
+import { useAccount } from "wagmi";
 
 export function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [formattedBalance, setFormattedBalance] = useState(0);
+
+  const { address, isConnected } = useAccount();
+
+  useEffect(() => {
+    const fetchBalance = async () => {
+      if (!address || !isConnected) {
+        setFormattedBalance("0");
+        return;
+      }
+
+      try {
+        if (!window.ethereum) {
+          throw new Error("Ethereum provider not found");
+        }
+
+        const provider = new ethers.BrowserProvider(window.ethereum);
+        const signer = await provider.getSigner();
+
+        const contract = new ethers.Contract(
+          erc_conto.address,
+          erc_conto.abi,
+          signer
+        );
+
+        const balance = await contract.balanceOf(address);
+        const formatted = ethers.formatUnits(balance, 18);
+
+        setFormattedBalance(Number(formatted).toFixed(4));
+      } catch (err) {
+        setFormattedBalance("0");
+      }
+    };
+
+    fetchBalance();
+  }, [address, isConnected]);
 
   return (
     <header className="p-4 bg-black text-white shadow-lg">
@@ -70,6 +109,10 @@ export function Navbar() {
             >
               <UserRoundIcon className="w-5 h-5 text-white hover:text-lime-500" />
             </Link>
+            <h1 className="flex items-center text-white font-mono">
+              <Image src="/BarterxCoin.png" alt="logo" width={30} height={30} />
+              {formattedBalance} BRTX
+            </h1>
             <ConnectButton />
           </div>
 

@@ -2,7 +2,7 @@ import NftContract_config from "@/contract/Nftname_transfer.json";
 import Marketplace_config from "@/contract/Market_place.json";
 import Erc_config from "@/contract/Erc20.json";
 import { ethers } from "ethers";
-import { approveToken } from "./approval";
+import { approveToken } from "@/hooks/approval.js";
 import { erc721Abi } from "viem";
 
 export async function useContract() {
