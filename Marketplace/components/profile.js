@@ -67,10 +67,11 @@ export default function ProfilePage() {
   const [nftData, setNftData] = useState({
     ownerNFTs: [],
     listedNFTs: [],
-    collectionName: ""
+    collectionName: "",
   });
   const menuRef = useRef(null);
   const popupRef = useRef(null);
+  const [user, setusername] = useState(null);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -99,11 +100,12 @@ export default function ProfilePage() {
       try {
         const slugData = await GetSlug(address);
         if (slugData?.collections?.[0]?.data) {
-          const { ownerNFTs = [], listedNFTs = [] } = slugData.collections[0].data;
+          const { ownerNFTs = [], listedNFTs = [] } =
+            slugData.collections[0].data;
           setNftData({
             ownerNFTs,
             listedNFTs,
-            collectionName: slugData.collections[0].slug || "My Collection"
+            collectionName: slugData.collections[0].slug || "My Collection",
           });
         }
       } catch (error) {
@@ -118,6 +120,14 @@ export default function ProfilePage() {
   const isValidSlug = (slug) => {
     return /^(?!-)(?!.*--)[a-z0-9-]+(?<!-)$/.test(slug);
   };
+
+  useEffect(() => {
+    const nameSet = () => {
+      const sliced = address?.slice(-2) || "";
+      setusername(sliced);
+    };
+    nameSet();
+  }, [address]);
 
   const handleSaveSlug = async () => {
     setLoading(true);
@@ -156,13 +166,13 @@ export default function ProfilePage() {
 
   const isNFTListed = (nft) => {
     return nftData.listedNFTs.some(
-      listedNFT => listedNFT.identifier === nft.identifier
+      (listedNFT) => listedNFT.identifier === nft.identifier
     );
   };
 
   const getListingDetails = (nft) => {
     return nftData.listedNFTs.find(
-      listedNFT => listedNFT.identifier === nft.identifier
+      (listedNFT) => listedNFT.identifier === nft.identifier
     );
   };
 
@@ -230,7 +240,7 @@ export default function ProfilePage() {
           <div className="ml-6 mb-1">
             <div className="flex items-center gap-3">
               <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-[#b2ff00] to-white">
-                {ensName || "DapRader"}
+                Barteronaut_0x_{user}
               </h1>
               <button
                 onClick={copyAddress}
@@ -268,11 +278,13 @@ export default function ProfilePage() {
               {nftData.listedNFTs.map((nft) => {
                 const listing = getListingDetails(nft);
                 return (
-                  <NFTCard 
-                    key={`listed-${nft.identifier}`} 
-                    nft={nft} 
+                  <NFTCard
+                    key={`listed-${nft.identifier}`}
+                    nft={nft}
                     isListed={true}
-                    price={listing ? (parseInt(listing.price?.value || "0") / 1e18) : 0}
+                    price={
+                      listing ? parseInt(listing.price?.value || "0") / 1e18 : 0
+                    }
                   />
                 );
               })}
@@ -286,11 +298,13 @@ export default function ProfilePage() {
               const isListed = isNFTListed(nft);
               const listing = isListed ? getListingDetails(nft) : null;
               return (
-                <NFTCard 
-                  key={`owned-${nft.identifier}`} 
-                  nft={nft} 
+                <NFTCard
+                  key={`owned-${nft.identifier}`}
+                  nft={nft}
                   isListed={isListed}
-                  price={listing ? (parseInt(listing.price?.value || "0") / 1e18) : 0}
+                  price={
+                    listing ? parseInt(listing.price?.value || "0") / 1e18 : 0
+                  }
                 />
               );
             })}
@@ -384,29 +398,31 @@ export default function ProfilePage() {
 
 const NFTCard = ({ nft, isListed, price }) => {
   return (
-    <div className={`bg-[#1a1a1a] rounded-xl overflow-hidden border ${
-      isListed 
-        ? 'border-[#b2ff00] shadow-[0_0_15px_-5px_#b2ff00]' 
-        : 'border-[#404040] hover:border-[#b2ff00]/50'
-    } transition-all group relative`}>
+    <div
+      className={`bg-[#1a1a1a] rounded-xl overflow-hidden border ${
+        isListed
+          ? "border-[#b2ff00] shadow-[0_0_15px_-5px_#b2ff00]"
+          : "border-[#404040] hover:border-[#b2ff00]/50"
+      } transition-all group relative`}
+    >
       {isListed && (
         <div className="absolute top-2 right-2 flex items-center gap-1 bg-black/50 backdrop-blur-sm border border-[#b2ff00] text-[#b2ff00] text-xs font-bold px-2 py-1 rounded-full z-10 transform transition-transform hover:scale-105">
-        <svg 
-          xmlns="http://www.w3.org/2000/svg" 
-          width="12" 
-          height="12" 
-          viewBox="0 0 24 24" 
-          fill="none" 
-          stroke="currentColor" 
-          strokeWidth="2" 
-          strokeLinecap="round" 
-          strokeLinejoin="round"
-          className="text-[#b2ff00]"
-        >
-          <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path>
-        </svg>
-        LISTED
-      </div>
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="text-[#b2ff00]"
+          >
+            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path>
+          </svg>
+          LISTED
+        </div>
       )}
       <div className="w-full aspect-square relative overflow-hidden">
         {nft.image_url ? (
@@ -429,9 +445,7 @@ const NFTCard = ({ nft, isListed, price }) => {
         </h3>
         <div className="flex justify-between items-center mt-3">
           <div>
-            <p className="text-xs text-gray-400">
-              {isListed ? "Price" : "ID"}
-            </p>
+            <p className="text-xs text-gray-400">{isListed ? "Price" : "ID"}</p>
             {isListed ? (
               <span className="text-[#b2ff00] text-sm font-mono">
                 {price} ETH
