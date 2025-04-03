@@ -6,7 +6,7 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
@@ -30,7 +30,21 @@ export default function Market() {
   const nftsPerPage = 4;
   const router = useRouter();
 
-  const fetchNFTs = async () => {
+  const generateStableCryptoPrice = (contract, tokenId) => {
+    const hash = `${contract}-${tokenId}`.split("").reduce((acc, char) => {
+      return acc + char.charCodeAt(0);
+    }, 0);
+
+    const patterns = [
+      0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5,
+    ];
+    const selectedPattern = patterns[hash % patterns.length];
+    const variation = 0.9 + (hash % 20) / 100;
+
+    return Math.round(selectedPattern * variation * 10 ** 18);
+  };
+
+  const fetchNFTs = useCallback(async () => {
     setLoading(true);
     setError(null);
 
@@ -74,7 +88,7 @@ export default function Market() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentPage, process.env.NEXT_PUBLIC_WALLET, generateStableCryptoPrice]);
 
   const updateDisplayedNfts = (nfts, page) => {
     const startIndex = (page - 1) * nftsPerPage;
@@ -110,20 +124,6 @@ export default function Market() {
       "nft-favorites",
       JSON.stringify(Array.from(newFavorites))
     );
-  };
-
-  const generateStableCryptoPrice = (contract, tokenId) => {
-    const hash = `${contract}-${tokenId}`.split("").reduce((acc, char) => {
-      return acc + char.charCodeAt(0);
-    }, 0);
-
-    const patterns = [
-      0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5,
-    ];
-    const selectedPattern = patterns[hash % patterns.length];
-    const variation = 0.9 + (hash % 20) / 100;
-
-    return Math.round(selectedPattern * variation * 10 ** 18);
   };
 
   const handleBuy = async (nft) => {
