@@ -115,7 +115,7 @@ export default function NavBar() {
       <div className="flex-1 flex justify-center items-center">
         <div>
           <Link
-            href="/marketplace"
+            href="https://barterx-plum.vercel.app/"
             className="text-white/80 ml-26 hover:text-lime-400 transition-colors duration-300 text-lg font-medium hidden md:block"
           >
             Explore Marketplace.
@@ -157,13 +157,13 @@ export default function NavBar() {
                     <Plus className="w-5 h-5 mr-3 text-gray-400 group-hover:text-white" />
                     <span>Add Product</span>
                   </button>
-                  <button
+                  {/* <button
                     onClick={() => router.push("/profile")}
                     className="flex items-center w-full px-4 py-3 text-gray-300 hover:bg-gray-700 hover:text-white transition-all duration-200 group"
                   >
                     <UserIcon className="w-5 h-5 mr-3 text-gray-400 group-hover:text-white" />
                     <span>Profile</span>
-                  </button>
+                  </button> */}
 
                   <div className="border-t border-gray-700 my-1" />
 
