@@ -10,7 +10,7 @@ const queryClient = new QueryClient();
 
 const config = getDefaultConfig({
   appName: "Distributor",
-  projectId: process.env.NEXT_PUBLIC_RAINBOWKIT_ID,
+  projectId: process.env.NEXT_PUBLIC_WALLET_PROJECT_ID,
   chains: [sepolia],
   ssr: true,
 });

@@ -1,10 +1,9 @@
-import { ConnectButton } from "@rainbow-me/rainbowkit";
-import Image from "next/image";
+import OrdersPage from "@/components/OrdersPage";
 
 export default function Home() {
   return (
     <div>
-      <ConnectButton />
+      <OrdersPage />
     </div>
   );
 }
