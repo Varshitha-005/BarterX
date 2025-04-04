@@ -7,6 +7,7 @@ import { Loader2, Gem, ShoppingBag, Wallet } from "lucide-react";
 import { useContract } from "@/hooks/useContract";
 import { ethers } from "ethers";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
+import Link from "next/link";
 
 export default function Exchange() {
   const { address } = useAccount();
@@ -188,11 +189,12 @@ export default function Exchange() {
 
   if (nftData.listedNFTs.length === 0 && nftData.ownerNFTs.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen">
+      <div className="flex flex-col gap-3 items-center justify-center min-h-screen">
         <Gem className="w-12 h-12 text-gray-400" />
         <p className="mt-4 text-xl text-gray-300">
           No NFTs found in your wallet
         </p>
+        <Link href="/profile" className="p-3 bg-lime-500 rounded-md">add slug to get nfts</Link>
       </div>
     );
   }
@@ -200,8 +202,6 @@ export default function Exchange() {
   return (
     <div className="min-h-screen bg-black py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
-        <h1 className="text-4xl font-bold text-white mb-8">Your NFTs</h1>
-
         {error && (
           <div className="mb-6 p-4 bg-red-900/50 text-red-200 rounded-lg">
             Error: {error}
