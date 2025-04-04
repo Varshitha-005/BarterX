@@ -1,5 +1,23 @@
 # BarterX: NFT Marketplace for Digital Assets and Physical Goods Exchange
 
+## Live Deployments
+
+We have two main applications deployed:
+
+| Application       | Description                          | URL                                      |
+|-------------------|--------------------------------------|------------------------------------------|
+| BarterX Marketplace | Main marketplace for buying/selling  | [https://barterx-plum.vercel.app/](https://barterx-plum.vercel.app/) |
+| BarterX Delivery  | Delivery management portal           | [https://delivery-barterx.vercel.app/](https://delivery-barterx.vercel.app/) |
+| BarterX sellers | portal for sellers | [https://sellers-barterx.vercel.app/](https://sellers-barterx.vercel.app/) |
+
+## Contract Addresses (Sepolia Testnet)
+
+| Contract Name       | Description                          | Address                                      | Chain ID |
+|---------------------|--------------------------------------|----------------------------------------------|----------|
+| Transfer Contract   | Handles NFT transfers             | `0x4238D6a6f740d84827b80d5c1e9984907e415c6f` | 11155111 |
+| BRTX Token (ERC20)  | BarterX utility token               | `0x73fc86b73fd4a7978F8EBAD2e5fba1EF32754302` | 11155111 |
+| Marketplace         | Main trading platform               | `0x8253807b471179779ad283235e476F34aE6CB3CE` | 11155111 |
+
 ## Overview
 
 The **BarterX** platform is a revolutionary marketplace that enables users to exchange Non-Fungible Tokens (NFTs) for **BRTX** tokens, an ERC20-based digital currency. These **BRTX** tokens can then be utilized to purchase a wide variety of physical goods, effectively bridging the gap between the digital and physical worlds. By integrating the security and transparency of blockchain technology with real-world commerce, BarterX empowers users to unlock the tangible value of their digital assets.
