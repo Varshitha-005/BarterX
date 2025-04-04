@@ -16,6 +16,8 @@ import {
   Info,
   Settings,
   X,
+  Scan,
+  Clipboard,
 } from "lucide-react";
 import { QRCode } from "react-qr-code";
 
@@ -24,7 +26,6 @@ export default function OrdersPage() {
   const [products, setProducts] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [paymentStatus, setPaymentStatus] = useState({});
   const [fulfillingOrder, setFulfillingOrder] = useState(null);
   const [expandedOrder, setExpandedOrder] = useState(null);
   const [selectedOrder, setSelectedOrder] = useState(null);
@@ -38,6 +39,8 @@ export default function OrdersPage() {
     phoneNumber: "",
   });
   const [activeTab, setActiveTab] = useState("all");
+  const [paymentVerified, setPaymentVerified] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const connectWallet = async () => {
     try {
@@ -80,7 +83,7 @@ export default function OrdersPage() {
       for (let i = 1; i < orderCount; i++) {
         try {
           const order = await contract.orders(i);
-          if (order.buyer === ethers.ZeroAddress) continue; // Skip deleted orders
+          if (order.buyer === ethers.ZeroAddress) continue;
           ordersArray.push({
             id: i,
             productId: order.productId.toString(),
@@ -90,7 +93,7 @@ export default function OrdersPage() {
             seller: order.seller,
             isPaid: order.isPaid,
             isDelivered: order.isDelivered,
-            timestamp: new Date().toLocaleString(), // Fallback since contract doesn't store timestamp
+            timestamp: new Date().toLocaleString(),
           });
         } catch (err) {
           console.warn(`Error fetching order ${i}:`, err);
@@ -107,7 +110,7 @@ export default function OrdersPage() {
             price: ethers.formatUnits(product.price, 18),
             priceRaw: product.price.toString(),
             description: ethers.toUtf8String(product.description),
-            image: product.image,
+            image: ethers.toUtf8String(product.image),
             productType: ethers.decodeBytes32String(product.productType),
             condition: ethers.decodeBytes32String(product.condition),
             seller: product.seller,
@@ -163,19 +166,6 @@ export default function OrdersPage() {
   const confirmDelivery = async (orderId) => {
     try {
       setFulfillingOrder(orderId);
-      const order = orders.find((o) => o.id === orderId);
-
-      if (!order.isPaid) {
-        const isPaid = await checkPaymentStatusWithRetry(orderId);
-        if (!isPaid) {
-          const product = products[order.productId];
-          throw new Error(
-            `Payment not detected. Please send ${product.price} BRTX to ${order.seller} ` +
-              `using token contract ${erc_config.address} and wait for confirmation`
-          );
-        }
-      }
-
       const provider = new ethers.BrowserProvider(window.ethereum);
       const signer = await provider.getSigner();
       const contract = new ethers.Contract(
@@ -187,6 +177,7 @@ export default function OrdersPage() {
       const tx = await contract.confirmDelivery(orderId);
       await tx.wait();
       await fetchOrdersAndProducts(provider, true);
+      setPaymentVerified(false);
     } catch (error) {
       console.error("Delivery confirmation failed:", error);
       setError(error.reason || error.message || "Failed to confirm delivery");
@@ -217,6 +208,12 @@ export default function OrdersPage() {
     }
   };
 
+  const copyToClipboard = (text) => {
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   useEffect(() => {
     if (!window.ethereum || !currentAccount) return;
 
@@ -233,7 +230,7 @@ export default function OrdersPage() {
         {
           id: Number(orderId),
           productId: productId.toString(),
-          amount: "0", // Updated after payment
+          amount: "0",
           amountRaw: "0",
           buyer,
           seller,
@@ -285,18 +282,6 @@ export default function OrdersPage() {
     }
   }, []);
 
-  const bytesToImageUrl = (bytes) => {
-    try {
-      const hexString = ethers.hexlify(bytes);
-      if (hexString.startsWith("0x64617461")) {
-        return `data:image/png;base64,${hexString.slice(10)}`;
-      }
-      return `https://ipfs.io/ipfs/${hexString.slice(2)}`;
-    } catch (e) {
-      return "/placeholder-product.png";
-    }
-  };
-
   const formatAddress = (address) =>
     `${address.slice(0, 6)}...${address.slice(-4)}`;
 
@@ -340,6 +325,131 @@ export default function OrdersPage() {
     if (activeTab === "completed") return order.isPaid && order.isDelivered;
     return true;
   });
+
+  const renderPaymentSection = () => {
+    const paymentURI = `ethereum:${
+      erc_config.address
+    }@11155111/transfer?address=${encodeURIComponent(
+      selectedOrder.seller
+    )}&value=${products[selectedOrder.productId]?.priceRaw || "0"}`;
+
+    return (
+      <div className="bg-gray-700 rounded-lg p-4">
+        <div className="flex flex-col items-center">
+          <div className="mb-4 p-4 bg-white rounded-lg">
+            <QRCode
+              value={paymentURI}
+              size={200}
+              level="Q"
+              bgColor="#ffffff"
+              fgColor="#000000"
+            />
+          </div>
+          <p className="text-sm text-gray-300 mb-4">
+            Scan to verify payment. After scanning, confirm delivery below.
+          </p>
+
+          <div className="w-full bg-gray-800 p-3 rounded-lg mb-4">
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-xs text-gray-400">Amount:</span>
+              <span className="font-mono text-sm">
+                {products[selectedOrder.productId]?.price || "0"} BRTX
+              </span>
+            </div>
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-xs text-gray-400">To:</span>
+              <span className="text-sm">
+                {formatAddress(selectedOrder.seller)}
+              </span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-xs text-gray-400">Token:</span>
+              <span className="text-sm">
+                {formatAddress(erc_config.address)}
+              </span>
+            </div>
+          </div>
+
+          <button
+            onClick={() => copyToClipboard(paymentURI)}
+            className="px-3 py-1 bg-gray-600 hover:bg-gray-500 rounded text-sm mb-4 flex items-center"
+          >
+            {copied ? (
+              <CheckCircle className="h-4 w-4 mr-2 text-green-400" />
+            ) : (
+              <Clipboard className="h-4 w-4 mr-2" />
+            )}
+            {copied ? "Copied!" : "Copy Payment Link"}
+          </button>
+
+          <div className="flex space-x-3 w-full">
+            <button
+              onClick={async () => {
+                const isPaid = await checkPaymentStatus(selectedOrder.id);
+                setPaymentVerified(isPaid);
+                if (!isPaid) {
+                  setError("Payment not yet detected. Please try again.");
+                }
+              }}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg flex-1 flex items-center justify-center"
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Verify Payment
+            </button>
+
+            {paymentVerified && (
+              <button
+                onClick={() => confirmDelivery(selectedOrder.id)}
+                disabled={fulfillingOrder === selectedOrder.id}
+                className={`px-4 py-2 rounded-lg transition-colors flex-1 flex items-center justify-center ${
+                  fulfillingOrder === selectedOrder.id
+                    ? "bg-gray-600"
+                    : "bg-green-600 hover:bg-green-700"
+                }`}
+              >
+                {fulfillingOrder === selectedOrder.id ? (
+                  <>
+                    <svg
+                      className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      />
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      />
+                    </svg>
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="mr-2 h-4 w-4" />
+                    Confirm Delivery
+                  </>
+                )}
+              </button>
+            )}
+          </div>
+
+          {!paymentVerified && !selectedOrder.isPaid && (
+            <div className="mt-3 text-xs text-yellow-400">
+              Payment not yet verified. Please scan and verify payment first.
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
 
   if (loading)
     return (
@@ -449,7 +559,7 @@ export default function OrdersPage() {
                       <div className="flex items-center">
                         {product?.image && (
                           <img
-                            src={bytesToImageUrl(product.image)}
+                            src={product.image}
                             alt={product?.name || "Product"}
                             className="flex-shrink-0 h-12 w-12 rounded-lg object-cover border border-gray-700"
                           />
@@ -674,7 +784,10 @@ export default function OrdersPage() {
                 Order Details #{selectedOrder.id}
               </h2>
               <button
-                onClick={() => setShowDetailsModal(false)}
+                onClick={() => {
+                  setShowDetailsModal(false);
+                  setPaymentVerified(false);
+                }}
                 className="text-gray-400 hover:text-white"
               >
                 <X className="h-6 w-6" />
@@ -690,9 +803,7 @@ export default function OrdersPage() {
                   <div className="space-y-3">
                     <div className="flex items-center">
                       <img
-                        src={bytesToImageUrl(
-                          products[selectedOrder.productId].image
-                        )}
+                        src={products[selectedOrder.productId].image}
                         alt={products[selectedOrder.productId].name}
                         className="h-24 w-24 rounded-lg object-cover border border-gray-700"
                       />
@@ -743,64 +854,7 @@ export default function OrdersPage() {
               </div>
 
               <div className="space-y-4">
-                {!selectedOrder.isPaid && (
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-400 mb-2">
-                      Payment Required (BRTX Token)
-                    </h3>
-                    <div className="bg-gray-700 rounded-lg p-4">
-                      <div className="flex flex-col items-center">
-                        <div className="mb-4 p-2 bg-white rounded">
-                          <QRCode
-                            value={`ethereum:${
-                              erc_config.address
-                            }@11155111/transfer?address=${
-                              selectedOrder.seller
-                            }&uint256=${
-                              products[selectedOrder.productId]?.priceRaw || "0"
-                            }`}
-                            size={160}
-                            level="H"
-                          />
-                        </div>
-                        <p className="text-sm text-gray-300 mb-2">
-                          Scan to transfer BRTX tokens to seller
-                        </p>
-                        <div className="text-center w-full">
-                          <div className="grid grid-cols-2 gap-4 mb-3">
-                            <div>
-                              <p className="text-xs text-gray-400">Amount</p>
-                              <p className="text-lg font-mono">
-                                {products[selectedOrder.productId]?.price ||
-                                  "0"}{" "}
-                                BRTX
-                              </p>
-                            </div>
-                            <div>
-                              <p className="text-xs text-gray-400">
-                                Seller Address
-                              </p>
-                              <p className="text-sm">
-                                {formatAddress(selectedOrder.seller)}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="bg-gray-800 p-3 rounded-lg">
-                            <p className="text-xs text-gray-400">
-                              Token Contract
-                            </p>
-                            <p className="text-sm font-mono">
-                              {formatAddress(erc_config.address)}
-                            </p>
-                          </div>
-                          <div className="mt-3 text-xs text-gray-500">
-                            Network: Sepolia (Chain ID: 11155111)
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
+                {!selectedOrder.isPaid && renderPaymentSection()}
 
                 <div>
                   <h3 className="text-sm font-medium text-gray-400 mb-2">
@@ -827,10 +881,7 @@ export default function OrdersPage() {
                             selectedOrder.id
                           );
                           if (isPaid) {
-                            setPaymentStatus((prev) => ({
-                              ...prev,
-                              [selectedOrder.id]: "detected",
-                            }));
+                            setPaymentVerified(true);
                           } else {
                             setError("Payment not yet received");
                           }
@@ -891,55 +942,14 @@ export default function OrdersPage() {
 
             <div className="mt-6 pt-6 border-t border-gray-700 flex justify-end space-x-3">
               <button
-                onClick={() => setShowDetailsModal(false)}
+                onClick={() => {
+                  setShowDetailsModal(false);
+                  setPaymentVerified(false);
+                }}
                 className="px-4 py-2 border border-gray-600 rounded-lg hover:bg-gray-700 transition-colors"
               >
                 Close
               </button>
-              {!selectedOrder.isDelivered &&
-                selectedOrder.buyer.toLowerCase() ===
-                  currentAccount?.toLowerCase() && (
-                  <button
-                    onClick={() => cancelOrder(selectedOrder.id)}
-                    disabled={fulfillingOrder === selectedOrder.id}
-                    className={`px-4 py-2 rounded-lg transition-colors flex items-center ${
-                      fulfillingOrder === selectedOrder.id
-                        ? "bg-gray-600"
-                        : "bg-red-600 hover:bg-red-700"
-                    }`}
-                  >
-                    {fulfillingOrder === selectedOrder.id ? (
-                      <>
-                        <svg
-                          className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
-                          xmlns="http://www.w3.org/2000/svg"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                        >
-                          <circle
-                            className="opacity-25"
-                            cx="12"
-                            cy="12"
-                            r="10"
-                            stroke="currentColor"
-                            strokeWidth="4"
-                          />
-                          <path
-                            className="opacity-75"
-                            fill="currentColor"
-                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                          />
-                        </svg>
-                        Cancelling...
-                      </>
-                    ) : (
-                      <>
-                        <XCircle className="-ml-1 mr-2 h-4 w-4" />
-                        Cancel Order
-                      </>
-                    )}
-                  </button>
-                )}
               {selectedOrder.isPaid &&
                 !selectedOrder.isDelivered &&
                 selectedOrder.seller.toLowerCase() ===
@@ -981,50 +991,6 @@ export default function OrdersPage() {
                       <>
                         <CheckCircle className="-ml-1 mr-2 h-4 w-4" />
                         Confirm Delivery
-                      </>
-                    )}
-                  </button>
-                )}
-              {!selectedOrder.isPaid &&
-                selectedOrder.seller.toLowerCase() ===
-                  currentAccount?.toLowerCase() && (
-                  <button
-                    onClick={() => confirmDelivery(selectedOrder.id)}
-                    disabled={fulfillingOrder === selectedOrder.id}
-                    className={`px-4 py-2 rounded-lg transition-colors flex items-center ${
-                      fulfillingOrder === selectedOrder.id
-                        ? "bg-gray-600"
-                        : "bg-green-600 hover:bg-green-700"
-                    }`}
-                  >
-                    {fulfillingOrder === selectedOrder.id ? (
-                      <>
-                        <svg
-                          className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
-                          xmlns="http://www.w3.org/2000/svg"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                        >
-                          <circle
-                            className="opacity-25"
-                            cx="12"
-                            cy="12"
-                            r="10"
-                            stroke="currentColor"
-                            strokeWidth="4"
-                          />
-                          <path
-                            className="opacity-75"
-                            fill="currentColor"
-                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                          />
-                        </svg>
-                        Verifying...
-                      </>
-                    ) : (
-                      <>
-                        <CheckCircle className="mr-2 h-4 w-4" />
-                        Verify Payment & Deliver
                       </>
                     )}
                   </button>
